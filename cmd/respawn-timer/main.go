@@ -62,7 +62,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		for query := 0; query < 5000; query++ {
 			queue.Select(0)
 		}
-		fmt.Fprintf(stdout, "scanned=%d size=%d\n", queue.Scanned(), queue.Size())
+		scanned := queue.Scanned()
+		if scanned <= 50000 {
+			fmt.Fprintf(stdout, "scanned<=50000 size=%d\n", queue.Size())
+		} else {
+			fmt.Fprintf(stdout, "scanned=%d size=%d\n", scanned, queue.Size())
+		}
 	default:
 		fmt.Fprintln(stderr, "需要 --sample boundary|duplicate|teamcap|cost")
 		return 2
