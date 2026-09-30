@@ -2,37 +2,47 @@ package respawn
 
 import "testing"
 
-func TestPicksNearestClearPoint(t *testing.T) {
-	manager := &Manager{CooldownMs: 10000}
-	manager.Die(0, 0, 1000)
-	point, err := manager.Respawn(20000, []SpawnPoint{
-		{Name: "far", X: 7, Y: 0},
-		{Name: "near", X: 1, Y: 0},
-	})
-	if err != nil {
-		t.Fatalf("冷却走完以后应该能复活：%v", err)
+func TestSelectAfterCooldown(t *testing.T) {
+	queue := NewQueue(DefaultCooldownMs, 2)
+	queue.Enqueue(Player{Name: "a", Team: "red", DeadAt: 0})
+	chosen, ok := queue.Select(20000)
+	if !ok {
+		t.Fatal("冷却走完以后应该有人可以复活")
 	}
-	if point.Name != "near" {
-		t.Fatalf("应该挑最近的复活点：%s", point.Name)
+	if chosen.Name != "a" {
+		t.Fatalf("复活的人不对：%+v", chosen)
 	}
-}
-
-func TestRespawnClearsDeadFlag(t *testing.T) {
-	manager := &Manager{CooldownMs: 10000}
-	manager.Die(4, 4, 0)
-	if !manager.Dead() {
-		t.Fatal("Die 之后应该处于死亡状态")
-	}
-	if _, err := manager.Respawn(60000, []SpawnPoint{{Name: "a"}}); err != nil {
-		t.Fatalf("复活失败：%v", err)
-	}
-	if manager.Dead() {
-		t.Fatal("复活之后不应该还处于死亡状态")
+	if queue.Size() != 0 {
+		t.Fatalf("复活之后应该从队列移除：%d", queue.Size())
 	}
 }
 
-func TestSafeRadiusConstant(t *testing.T) {
-	if SafeRadius != 12 {
-		t.Fatal("安全半径被改了")
+func TestSelectEmptyQueue(t *testing.T) {
+	if _, ok := NewQueue(DefaultCooldownMs, 2).Select(1000); ok {
+		t.Fatal("空队列不该选出人")
+	}
+}
+
+func TestSizeCountsDistinctPlayers(t *testing.T) {
+	queue := NewQueue(DefaultCooldownMs, 2)
+	queue.Enqueue(Player{Name: "a", Team: "red", DeadAt: 0})
+	queue.Enqueue(Player{Name: "b", Team: "blue", DeadAt: 100})
+	if queue.Size() != 2 {
+		t.Fatalf("两个不同玩家应该占两条记录：%d", queue.Size())
+	}
+}
+
+func TestReleaseFreesTeamSlot(t *testing.T) {
+	queue := NewQueue(DefaultCooldownMs, 1)
+	queue.Occupy("red", 1)
+	queue.Release("red")
+	if queue.teamCounts["red"] != 0 {
+		t.Fatalf("释放之后队伍名额应该空出来：%d", queue.teamCounts["red"])
+	}
+}
+
+func TestConstants(t *testing.T) {
+	if DefaultCooldownMs != 10000 {
+		t.Fatal("冷却常量被改了")
 	}
 }
